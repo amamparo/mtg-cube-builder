@@ -132,17 +132,6 @@ socks = ["PySocks (>=1.5.6,!=1.5.7)"]
 use-chardet-on-py3 = ["chardet (>=3.0.2,<6)"]
 
 [[package]]
-name = "simanneal"
-version = "0.5.0"
-description = "Simulated Annealing in Python"
-category = "main"
-optional = false
-python-versions = "*"
-files = [
-    {file = "simanneal-0.5.0-py2.py3-none-any.whl", hash = "sha256:f93d90958ff1df68bc4a6e440892a19bbc0569ad9c6442fff659dc011b790b34"},
-]
-
-[[package]]
 name = "urllib3"
 version = "2.0.4"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
@@ -163,4 +152,4 @@ zstd = ["zstandard (>=0.18.0)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "d1ccfeef4ade0c85f5b994b86c34856a88bd6532f02f91021783b4606a55799a"
+content-hash = "2f1223dc33af6f607d099d2c766dc1d8ee77f935b3e05f7b742f85c68234a0e0"

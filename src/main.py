@@ -1,61 +1,53 @@
-import random
-from copy import deepcopy
-from statistics import mean
+from typing import Set, Dict
 
-from simanneal import Annealer
-
-from src.cards import get_cards
-
-required_card_names = ['The One Ring']
+from src.cards import get_cards, Card, Rarity, Color
 
 N = 48
-ANNEAL_STEPS = 25_000
 
-cards = [x for x in get_cards() if x.rarity in set('RM') and len(x.colors) <= 2]
-max_rating = max(x.rating for x in cards)
-colors = set([item for sublist in [x.colors for x in cards] for item in sublist])
+cards: Set[Card] = {x for x in get_cards() if len(x.colors) <= 2}
 
 
-class Problem(Annealer):
-    def __init__(self):
-        self.steps = ANNEAL_STEPS
-        required_cards = [x for x in cards if x.name in required_card_names]
-        super().__init__(required_cards + random.sample([x for x in cards if x.name not in required_card_names], N - len(required_cards)))
+def get_subcube(rarities: Set[Rarity], n: int) -> Set[Card]:
+    available_cards: Set[Card] = {x for x in cards if x.rarity in rarities}
+    optimal_distribution = __distribution(available_cards)
 
-    def move(self) -> None:
-        new_state = deepcopy(self.state)
-        removed = random.choice([x for x in new_state if x.name not in required_card_names])
-        new_state.remove(removed)
-        new_state.append(random.choice([x for x in cards if x not in self.state]))
-        self.state = new_state
+    subcube: Set[Card] = set()
 
-    def energy(self) -> float:
-        rating_score = mean(x.rating for x in self.state) / max_rating
+    while len(subcube) < n:
+        current_distribution = __distribution(subcube)
+        distribution_distances = {c: v - current_distribution.get(c, 0) for c, v in optimal_distribution.items()}
+        high_distribution_distance = max(distribution_distances.values())
+        candidate_colors = {c for c, v in distribution_distances.items() if v == high_distribution_distance}
+        next_card = sorted(
+            [x for x in available_cards if candidate_colors.intersection(x.colors)],
+            key=lambda x: x.rating, reverse=True
+        )[0]
+        subcube.add(next_card)
+        available_cards.remove(next_card)
 
-        color_counts = {x: 0 for x in colors}
-        for card in self.state:
-            for color in card.colors:
-                color_counts[color] += 1
-        low_color_count = min(color_counts.values())
-        high_color_count = max(color_counts.values())
-        color_score = low_color_count / high_color_count
-
-        return -(rating_score * color_score)
+    return subcube
 
 
 def main():
-    optimal_cards, foo = Problem().anneal()
-    optimal_cards = sorted(optimal_cards, key=lambda x: x.rating, reverse=True)
-    for color in colors:
-        color_cards = [x for x in optimal_cards if color in x.colors]
+    cube: Set[Card] = set()
+    cube.update(get_subcube({Rarity.RARE, Rarity.MYTHIC}, 24))
+    cube.update(get_subcube({Rarity.UNCOMMON}, 48))
+    cube.update(get_subcube({Rarity.COMMON}, 80))
+
+    for color in {item for sublist in [x.colors for x in cards] for item in sublist}:
+        color_cards = sorted([x for x in cube if color in x.colors], key=lambda x: x.rating, reverse=True)
         print(f'\n{color} ({len(color_cards)})\n---------')
         for card in color_cards:
             print(f'{card.name} ({card.rating})')
 
-    color_cards = [x for x in optimal_cards if not x.colors]
-    print(f'\nColorless ({len(color_cards)})\n---------')
-    for card in color_cards:
-        print(f'{card.name} ({card.rating})')
+
+def __distribution(_cards: Set[Card]) -> Dict[Color, float]:
+    colors = {}
+    for card in _cards:
+        for color in card.colors:
+            colors[color] = colors.get(color, 0) + 1
+    total = sum(colors.values())
+    return {c: v / total for c, v in colors.items()}
 
 
 if __name__ == '__main__':
