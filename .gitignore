@@ -1,0 +1,6 @@
+.idea
+**/*.pyc
+.data/*
+!.data/.gitignore
+**/*.DS_Store
+data.json
