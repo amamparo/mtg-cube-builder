@@ -1,39 +1,30 @@
-from typing import Set, Dict, List, Union
+from dataclasses import dataclass
+from typing import Set, Dict, List, Collection
 
 from src.cards import get_cards, Card, Rarity, Color
 
-N = 48
 
-cards: Set[Card] = {x for x in get_cards() if len(x.colors) <= 2}
+@dataclass
+class Settings:
+    players: int = 8
+    n_of_each_rare_up: int = 1
+    n_of_each_uncommon: int = 2
+    n_of_each_common: int = 3
 
 
-def get_subcube(rarities: Set[Rarity], n_unique: int, n_of_each: int) -> List[Card]:
-    available_cards: Set[Card] = {x for x in cards if x.rarity in rarities}
-    optimal_distribution = __distribution(available_cards)
+settings = Settings()
 
-    subcube: List[Card] = []
-
-    while len(subcube) < n_unique * n_of_each:
-        current_distribution = __distribution(subcube)
-        distribution_distances = {c: v - current_distribution.get(c, 0) for c, v in optimal_distribution.items()}
-        high_distribution_distance = max(distribution_distances.values())
-        candidate_colors = {c for c, v in distribution_distances.items() if v == high_distribution_distance}
-        next_card = sorted(
-            [x for x in available_cards if candidate_colors.intersection(x.colors)],
-            key=lambda x: x.rating, reverse=True
-        )[0]
-        for _ in range(n_of_each):
-            subcube.append(next_card)
-        available_cards.remove(next_card)
-
-    return subcube
+cards: Set[Card] = get_cards()
 
 
 def main():
     cube: List[Card] = []
-    cube.extend(get_subcube({Rarity.RARE, Rarity.MYTHIC}, 24, 1))
-    cube.extend(get_subcube({Rarity.UNCOMMON}, 48, 2))
-    cube.extend(get_subcube({Rarity.COMMON}, 80, 3))
+
+    total_packs = settings.players * 3
+
+    cube += __get_subcube({Rarity.RARE, Rarity.MYTHIC}, total_packs, 1)
+    cube += __get_subcube({Rarity.UNCOMMON}, total_packs * 4, 2)
+    cube += __get_subcube({Rarity.COMMON}, total_packs * 10, 3)
 
     for color in {item for sublist in [x.colors for x in cards] for item in sublist}:
         color_cards = sorted([x for x in cube if color in x.colors], key=lambda x: x.rating, reverse=True)
@@ -42,7 +33,27 @@ def main():
             print(f'{card.name} ({card.rating})')
 
 
-def __distribution(_cards: Union[Set[Card], List[Card]]) -> Dict[Color, float]:
+def __get_subcube(rarities: Collection[Rarity], n_cards: int, n_of_each: int) -> List[Card]:
+    available_cards: Set[Card] = {x for x in cards if x.rarity in rarities}
+    optimal_distribution = __distribution(available_cards)
+
+    subcube: List[Card] = []
+
+    while len(subcube) < n_cards:
+        current_distribution = __distribution(subcube)
+        distribution_distances = {c: v - current_distribution.get(c, 0) for c, v in optimal_distribution.items()}
+        high_distribution_distance = max(distribution_distances.values())
+        candidate_colors = {c for c, v in distribution_distances.items() if v == high_distribution_distance}
+        candidate_cards = filter(lambda x: candidate_colors.intersection(x.colors), available_cards)
+        next_card = sorted(candidate_cards, key=lambda x: x.rating).pop()
+        for _ in range(n_of_each):
+            subcube.append(next_card)
+        available_cards.remove(next_card)
+
+    return subcube
+
+
+def __distribution(_cards: Collection[Card]) -> Dict[Color, float]:
     colors = {}
     for card in _cards:
         for color in card.colors:
