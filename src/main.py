@@ -1,31 +1,21 @@
-from dataclasses import dataclass
+from math import floor
+from os import getcwd, path
 from typing import Set, Dict, List, Collection, Optional
-
-from prettytable import PrettyTable
 
 from src.cards import get_cards, Card, Rarity, Color
 
-
-@dataclass
-class Settings:
-    players: int = 8
-    n_of_each_rare_up: int = 1
-    n_of_each_uncommon: int = 2
-    n_of_each_common: int = 3
-
-
-settings = Settings()
-
-cards: Set[Card] = get_cards()
+n_players = 8
 
 
 def main():
-    total_packs = settings.players * 3
+    cards = {x for x in get_cards() if len(x.colors) <= 2}
+    total_packs = n_players * 3
     cube = Cube() \
-        .merge(__get_subcube({Rarity.RARE, Rarity.MYTHIC}, total_packs, 1)) \
-        .merge(__get_subcube({Rarity.UNCOMMON}, total_packs * 4, 2)) \
-        .merge(__get_subcube({Rarity.COMMON}, total_packs * 10, 3))
-    print(cube)
+        .merge(__get_subcube(cards, {Rarity.MYTHIC, Rarity.RARE}, total_packs, 1)) \
+        .merge(__get_subcube(cards, {Rarity.UNCOMMON}, total_packs * 4, 2)) \
+        .merge(__get_subcube(cards, {Rarity.COMMON}, total_packs * 10, 4))
+    with open(path.join(getcwd(), 'cube.txt'), 'w') as f:
+        f.write('\n'.join(x.name for x in cube.cards))
 
 
 class Cube:
@@ -56,10 +46,9 @@ class Cube:
         return as_str
 
 
-def __get_subcube(rarities: Collection[Rarity], n_cards: int, n_of_each: int) -> Cube:
-    available_cards: Set[Card] = {x for x in cards if x.rarity in rarities}
+def __get_subcube(cards: Set[Card], rarities: Collection[Rarity], n_cards: int, n_of_each: int) -> Cube:
+    available_cards: Set[Card] = {x for x in cards if x.rarity in rarities and len(x.colors) <= 2}
     optimal_distribution = __distribution(available_cards)
-
     subcube = Cube()
 
     while len(subcube) < n_cards:
@@ -68,7 +57,7 @@ def __get_subcube(rarities: Collection[Rarity], n_cards: int, n_of_each: int) ->
         high_distribution_distance = max(distribution_distances.values())
         candidate_colors = {c for c, v in distribution_distances.items() if v == high_distribution_distance}
         candidate_cards = filter(lambda x: candidate_colors.intersection(x.colors), available_cards)
-        next_card = sorted(candidate_cards, key=lambda x: x.rating).pop()
+        next_card = sorted(candidate_cards, key=lambda x: x.rating, reverse=True)[0]
         for _ in range(n_of_each):
             subcube.add(next_card)
         available_cards.remove(next_card)
@@ -76,13 +65,13 @@ def __get_subcube(rarities: Collection[Rarity], n_cards: int, n_of_each: int) ->
     return subcube
 
 
-def __distribution(_cards: Collection[Card]) -> Dict[Color, float]:
-    colors = {}
-    for card in _cards:
+def __distribution(cards: Collection[Card]) -> Dict[Color, float]:
+    distribution = {c: 0 for c in Color}
+    for card in cards:
         for color in card.colors:
-            colors[color] = colors.get(color, 0) + 1
-    total = sum(colors.values())
-    return {c: v / total for c, v in colors.items()}
+            distribution[color] += 1
+    total = sum(distribution.values()) or 1
+    return {c: v / total for c, v in distribution.items()}
 
 
 if __name__ == '__main__':
